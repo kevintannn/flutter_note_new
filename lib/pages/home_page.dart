@@ -23,8 +23,18 @@ class _HomePageState extends State<HomePage> {
   // use note service
   final NoteService _noteService = NoteService();
 
+  // normal variable
+  String docIdToDelete = '';
+
+  // state variables
   String search = '';
   Timer? debounce;
+  bool isFirstFetch = true;
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   void dispose() {
@@ -34,6 +44,10 @@ class _HomePageState extends State<HomePage> {
 
   // change search state
   void handleSearch() {
+    setState(() {
+      isFirstFetch = false;
+    });
+
     if (debounce?.isActive ?? false) debounce?.cancel();
 
     debounce = Timer(const Duration(milliseconds: 500), () {
@@ -44,12 +58,34 @@ class _HomePageState extends State<HomePage> {
   }
 
   // show delete pop up
-  void showDeleteDialog(String docId) {
-    showPopUpDialog(context, [
+  void showDeleteDialog() {
+    showPopUpDialog(context, 'Confirm delete note?', [
       // delete
       MyDialogButton(
           onTap: () {
-            deleteNote(docId);
+            Navigator.pop(context);
+            showDeleteDialog2();
+          },
+          buttonColor: Colors.red,
+          textColor: Colors.white,
+          label: 'Delete'),
+
+      // cancel
+      MyDialogButton(
+          onTap: () => Navigator.pop(context),
+          buttonColor: Theme.of(context).colorScheme.secondary,
+          textColor: Colors.white,
+          label: 'Cancel'),
+    ]);
+  }
+
+  // show delete pop up
+  void showDeleteDialog2() {
+    showPopUpDialog(context, 'Double confirm delete note?', [
+      // delete
+      MyDialogButton(
+          onTap: () {
+            deleteNote();
             Navigator.pop(context);
           },
           buttonColor: Colors.red,
@@ -66,8 +102,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   // delete note
-  void deleteNote(String docId) async {
-    await _noteService.deleteNote(docId);
+  void deleteNote() async {
+    await _noteService.deleteNote(docIdToDelete);
   }
 
   @override
@@ -81,78 +117,89 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(15),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // header
-            const Row(
+        child: StreamBuilder(
+          stream: _noteService.getNotesStream(),
+          builder: (context, snapshot) {
+            // error
+            if (snapshot.hasError) {
+              return const Text("Error");
+            }
+
+            // loading
+            if (isFirstFetch &&
+                snapshot.connectionState == ConnectionState.waiting) {
+              return const MyLoadingSpinner();
+            }
+
+            // search logic
+            List<QueryDocumentSnapshot> filteredNotes =
+                snapshot.data!.docs.where((doc) {
+              String title = doc['title'].toString().toLowerCase();
+              String note = doc['note'].toString().toLowerCase();
+
+              return title.contains(search.toLowerCase()) ||
+                  note.contains(search.toLowerCase());
+            }).toList();
+
+            int noteCount = snapshot.data!.docs.length;
+
+            // return list view
+            return Column(
               children: [
-                Text(
-                  "Notes",
-                  style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+                // header
+                Row(
+                  children: [
+                    const Text(
+                      "Notes",
+                      style:
+                          TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      " ($noteCount)",
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w300),
+                    ),
+                  ],
                 ),
-                Text(
-                  " (275)",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w300),
+
+                const SizedBox(
+                  height: 10,
                 ),
+
+                // search bar
+                MySearchBar(
+                  searchController: searchController,
+                  onChanged: (value) => handleSearch(),
+                  hintText: 'Search notes',
+                  onTap: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotePage(),
+                        ));
+
+                    setState(() {
+                      search = '';
+                    });
+                    searchController.clear();
+                  },
+                ),
+
+                const SizedBox(
+                  height: 10,
+                ),
+
+                // list view and not found if it's empty
+                filteredNotes.isEmpty
+                    ? Container(
+                        margin: const EdgeInsets.only(top: 50),
+                        child: const Text("No Note"))
+                    : Expanded(child: _buildNoteList(filteredNotes))
               ],
-            ),
-
-            const SizedBox(
-              height: 10,
-            ),
-
-            // search box
-            MySearchBar(
-              searchController: searchController,
-              onChanged: (value) => handleSearch(),
-            ),
-
-            const SizedBox(
-              height: 10,
-            ),
-
-            // notes list view
-            Expanded(child: _buildNoteStream())
-          ],
+            );
+          },
         ),
       ),
-    );
-  }
-
-  // build note stream builder
-  Widget _buildNoteStream() {
-    return StreamBuilder(
-      stream: _noteService.getNotesStream(),
-      builder: (context, snapshot) {
-        // error
-        if (snapshot.hasError) {
-          return const Text("Error");
-        }
-
-        // loading
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const MyLoadingSpinner();
-        }
-
-        // search logic
-        List<QueryDocumentSnapshot> filteredNotes =
-            snapshot.data!.docs.where((doc) {
-          String title = doc['title'].toString().toLowerCase();
-          String note = doc['note'].toString().toLowerCase();
-
-          return title.contains(search.toLowerCase()) ||
-              note.contains(search.toLowerCase());
-        }).toList();
-
-        // not found text if filtered note is empty
-        if (filteredNotes.isEmpty) {
-          return const Text("Not found!");
-        }
-
-        // return list view
-        return _buildNoteList(filteredNotes);
-      },
     );
   }
 
@@ -168,7 +215,10 @@ class _HomePageState extends State<HomePage> {
               motion: const ScrollMotion(),
               children: [
                 SlidableAction(
-                  onPressed: (context) => showDeleteDialog(doc.id),
+                  onPressed: (context) {
+                    docIdToDelete = doc.id;
+                    showDeleteDialog();
+                  },
                   borderRadius: BorderRadius.circular(8),
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
@@ -178,12 +228,20 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             child: GestureDetector(
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => NotePage(
-                            noteId: doc.id,
-                          ))),
+              onTap: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => NotePage(
+                              noteId: doc.id,
+                              searchFromHome: search,
+                            ))).then((_) {
+                  setState(() {
+                    search = '';
+                  });
+                  searchController.clear();
+                });
+              },
               child: MyNoteCard(
                 title: doc['title'],
                 note: doc['note'],
