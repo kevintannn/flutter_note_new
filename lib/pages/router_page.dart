@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_note/pages/about_page.dart';
 import 'package:my_note/pages/home_page.dart';
 import 'package:my_note/pages/photos_page.dart';
 
@@ -10,7 +11,11 @@ class RouterPage extends StatefulWidget {
 }
 
 class _RouterPageState extends State<RouterPage> {
-  final List<Widget> _pages = [const HomePage(), const PhotosPage()];
+  final List<Widget> _pages = [
+    const HomePage(),
+    const PhotosPage(),
+    const AboutPage()
+  ];
   int _activePageIndex = 0;
 
   void navigateBottomBar(int index) {
@@ -27,7 +32,7 @@ class _RouterPageState extends State<RouterPage> {
         currentIndex: _activePageIndex,
         elevation: 0,
         selectedItemColor: Theme.of(context).colorScheme.inversePrimary,
-        unselectedItemColor: Theme.of(context).colorScheme.secondary,
+        unselectedItemColor: Theme.of(context).colorScheme.primary,
         onTap: (index) => navigateBottomBar(index),
         enableFeedback: false,
         items: const [
@@ -36,6 +41,9 @@ class _RouterPageState extends State<RouterPage> {
 
           // photos
           BottomNavigationBarItem(label: "Photos", icon: Icon(Icons.photo)),
+
+          // photos
+          BottomNavigationBarItem(label: "About", icon: Icon(Icons.info)),
         ],
       ),
     );
