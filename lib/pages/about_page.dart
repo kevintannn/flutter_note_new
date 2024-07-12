@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:my_note/themes/dark_theme.dart';
 import 'package:my_note/themes/light_theme.dart';
 import 'package:my_note/themes/theme_provider.dart';
 import 'package:provider/provider.dart';
