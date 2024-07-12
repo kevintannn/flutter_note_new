@@ -7,21 +7,28 @@ import 'package:my_note/services/note_service.dart';
 
 class NotePage extends StatefulWidget {
   final String? noteId;
+  final String? searchFromHome;
 
-  const NotePage({super.key, this.noteId});
+  const NotePage({super.key, this.noteId, this.searchFromHome});
 
   @override
   State<NotePage> createState() => _NotePageState();
 }
 
 class _NotePageState extends State<NotePage> {
-  final TextEditingController titleController = TextEditingController();
-  final TextEditingController noteController = TextEditingController();
-  final TextEditingController searchController = TextEditingController();
-
   // use note service
   final NoteService _noteService = NoteService();
 
+  // text controllers
+  final TextEditingController titleController = TextEditingController();
+  final TextEditingController noteController = TextEditingController();
+  final TextEditingController searchController = TextEditingController();
+  final ScrollController scrollController = ScrollController();
+
+  // focus node
+  final FocusNode searchFocusNode = FocusNode();
+
+  // state variables
   bool showLoading = false;
   Timer? debounce;
   String? _noteId;
@@ -33,10 +40,19 @@ class _NotePageState extends State<NotePage> {
   void initState() {
     super.initState();
     _noteId = widget.noteId;
+    searchController.text = widget.searchFromHome ?? '';
+    search = searchController.text;
 
-    debounce = Timer(const Duration(seconds: 1), () {
+    if (search.isNotEmpty) {
+      showSearch = true;
+    }
+
+    Timer(const Duration(seconds: 1), () {
       setState(() {
         isFirstFetch = false;
+        if (search.isNotEmpty) {
+          showSnackbar();
+        }
       });
     });
   }
@@ -44,6 +60,7 @@ class _NotePageState extends State<NotePage> {
   @override
   void dispose() {
     debounce?.cancel();
+    searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -74,11 +91,19 @@ class _NotePageState extends State<NotePage> {
   }
 
   // toggle search inside note
-  void toggleSearch() {
+  void toggleSearch() async {
     setState(() {
       showSearch = !showSearch;
       search = '';
     });
+
+    if (showSearch) {
+      Timer(const Duration(milliseconds: 300), () {
+        FocusScope.of(context).requestFocus(searchFocusNode);
+      });
+
+      showSnackbar();
+    }
 
     searchController.clear();
   }
@@ -109,6 +134,16 @@ class _NotePageState extends State<NotePage> {
     });
   }
 
+  // show snackbar
+  void showSnackbar() {
+    const snackBar = SnackBar(
+      content: Text('Double tap to close search'),
+      duration: Duration(seconds: 2),
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+  }
+
   // save note
   Future<String?> saveNote() async {
     return await _noteService.saveNote(
@@ -124,7 +159,10 @@ class _NotePageState extends State<NotePage> {
             isNoteEmpty()
                 ? const SizedBox()
                 : IconButton(
-                    onPressed: toggleSearch, icon: const Icon(Icons.search))
+                    onPressed: toggleSearch,
+                    icon: showSearch
+                        ? const Icon(Icons.close)
+                        : const Icon(Icons.search))
           ],
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.endTop,
@@ -135,6 +173,7 @@ class _NotePageState extends State<NotePage> {
         ));
   }
 
+  // build app bar leading
   Widget _buildAppBarLeading() {
     return showLoading
         ? const SizedBox(
@@ -149,6 +188,7 @@ class _NotePageState extends State<NotePage> {
             icon: const Icon(Icons.arrow_back));
   }
 
+  // build floating action button
   Widget _buildFloatingActionButton() {
     return !showSearch
         ? const SizedBox()
@@ -159,6 +199,7 @@ class _NotePageState extends State<NotePage> {
               height: 90,
               child: MyTextField(
                 textController: searchController,
+                focusNode: searchFocusNode,
                 hintText: 'Search note',
                 type: 2,
                 onChanged: (value) {
@@ -171,6 +212,7 @@ class _NotePageState extends State<NotePage> {
           );
   }
 
+  // build empty note
   Widget _buildEmptyNote() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -186,7 +228,7 @@ class _NotePageState extends State<NotePage> {
     );
   }
 
-  // future
+  // build existing note future
   Widget _buildExistingNote() {
     return FutureBuilder(
       future: _noteService.getNote(_noteId as String),
@@ -215,6 +257,7 @@ class _NotePageState extends State<NotePage> {
     );
   }
 
+  // build title textfield
   Widget _buildTitleTextFieldWidget() {
     return TextField(
       controller: titleController,
@@ -225,17 +268,20 @@ class _NotePageState extends State<NotePage> {
         border: OutlineInputBorder(borderSide: BorderSide.none),
       ),
       cursorColor: Theme.of(context).colorScheme.inversePrimary,
+      textCapitalization: TextCapitalization.sentences,
       style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w500),
     );
   }
 
+  // build note textfield
   Widget _buildNoteTextFieldWidget() {
     return showSearch
         ? Expanded(
             child: GestureDetector(
-              onTap: closeSearch,
+              onDoubleTap: closeSearch,
               child: Padding(
-                padding: const EdgeInsets.only(left: 12, right: 12, top: 13),
+                padding: const EdgeInsets.only(
+                    left: 12, right: 12, top: 14, bottom: 15),
                 child: Align(
                   alignment: Alignment.topLeft,
                   child: SingleChildScrollView(
@@ -248,18 +294,22 @@ class _NotePageState extends State<NotePage> {
             ),
           )
         : Expanded(
+            child: SingleChildScrollView(
+            controller: scrollController,
             child: TextField(
                 controller: noteController,
-                onTap: closeSearch,
                 onChanged: (value) => onNoteChanged(),
                 decoration: const InputDecoration(
                     hintText: 'Write note here',
                     hintStyle: TextStyle(fontWeight: FontWeight.w400),
                     border: OutlineInputBorder(borderSide: BorderSide.none)),
                 keyboardType: TextInputType.multiline,
-                maxLines: null));
+                textCapitalization: TextCapitalization.sentences,
+                maxLines: null),
+          ));
   }
 
+  // build highlighted search term
   TextSpan _buildHighlightedText(String text) {
     String localText = text.toLowerCase();
     String localSearchTerm = search.toLowerCase();
@@ -270,6 +320,8 @@ class _NotePageState extends State<NotePage> {
         color: Theme.of(context).brightness == Brightness.dark
             ? Colors.grey[300]
             : Colors.grey[800]);
+    TextStyle textStyle2 = const TextStyle(
+        fontSize: 16, letterSpacing: 0.5, height: 1.5, color: Colors.black);
 
     if (search.isEmpty) {
       return TextSpan(text: text, style: textStyle);
@@ -290,9 +342,9 @@ class _NotePageState extends State<NotePage> {
 
       spans.add(WidgetSpan(
         child: Container(
-          color: Theme.of(context).colorScheme.secondary,
+          color: Colors.yellow,
           child:
-              Text(text.substring(indexOfHighlight, start), style: textStyle),
+              Text(text.substring(indexOfHighlight, start), style: textStyle2),
         ),
       ));
     }
