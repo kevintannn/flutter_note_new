@@ -5,18 +5,21 @@ class MyTextField extends StatelessWidget {
   final String hintText;
   final void Function(String)? onChanged;
   final int? type;
+  final FocusNode? focusNode;
 
   const MyTextField(
       {super.key,
       this.textController,
       required this.hintText,
       this.onChanged,
-      this.type});
+      this.type,
+      this.focusNode});
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: textController,
+      focusNode: focusNode,
       cursorColor: Theme.of(context).colorScheme.inversePrimary,
       cursorWidth: 1,
       decoration: InputDecoration(
