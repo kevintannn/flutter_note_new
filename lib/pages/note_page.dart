@@ -23,7 +23,7 @@ class _NotePageState extends State<NotePage> {
   final TextEditingController titleController = TextEditingController();
   final TextEditingController noteController = TextEditingController();
   final TextEditingController searchController = TextEditingController();
-  final ScrollController scrollController = ScrollController();
+  // final ScrollController scrollController = ScrollController();
 
   // focus node
   final FocusNode searchFocusNode = FocusNode();
@@ -231,6 +231,7 @@ class _NotePageState extends State<NotePage> {
   // build existing note future
   Widget _buildExistingNote() {
     return FutureBuilder(
+      key: const PageStorageKey('note'),
       future: _noteService.getNote(_noteId as String),
       builder: (context, snapshot) {
         // error
@@ -295,8 +296,8 @@ class _NotePageState extends State<NotePage> {
           )
         : Expanded(
             child: SingleChildScrollView(
-            controller: scrollController,
             child: TextField(
+                key: const PageStorageKey('note'),
                 controller: noteController,
                 onChanged: (value) => onNoteChanged(),
                 decoration: const InputDecoration(
