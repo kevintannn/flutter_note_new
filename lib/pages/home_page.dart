@@ -235,12 +235,7 @@ class _HomePageState extends State<HomePage> {
                         builder: (context) => NotePage(
                               noteId: doc.id,
                               searchFromHome: search,
-                            ))).then((_) {
-                  setState(() {
-                    search = '';
-                  });
-                  searchController.clear();
-                });
+                            )));
               },
               child: MyNoteCard(
                 title: doc['title'],
