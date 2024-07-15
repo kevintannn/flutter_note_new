@@ -35,6 +35,8 @@ class _NotePageState extends State<NotePage> {
   bool isFirstFetch = true;
   bool showSearch = false;
   String search = '';
+  double textScaleFactor = 1;
+  bool searchNotFound = false;
 
   @override
   void initState() {
@@ -47,7 +49,7 @@ class _NotePageState extends State<NotePage> {
       showSearch = true;
     }
 
-    Timer(const Duration(seconds: 1), () {
+    debounce = Timer(const Duration(seconds: 1), () {
       setState(() {
         isFirstFetch = false;
         if (search.isNotEmpty) {
@@ -95,6 +97,7 @@ class _NotePageState extends State<NotePage> {
     setState(() {
       showSearch = !showSearch;
       search = '';
+      searchNotFound = false;
     });
 
     if (showSearch) {
@@ -114,6 +117,7 @@ class _NotePageState extends State<NotePage> {
       setState(() {
         showSearch = false;
         search = '';
+        searchNotFound = false;
       });
 
       searchController.clear();
@@ -123,15 +127,6 @@ class _NotePageState extends State<NotePage> {
   // check if note is empty
   bool isNoteEmpty() {
     return noteController.text.isEmpty;
-  }
-
-  // debounce search
-  void handleSearch() {
-    if (debounce?.isActive ?? false) debounce?.cancel();
-
-    debounce = Timer(const Duration(seconds: 1), () {
-      search = searchController.text;
-    });
   }
 
   // show snackbar
@@ -152,6 +147,8 @@ class _NotePageState extends State<NotePage> {
 
   @override
   Widget build(BuildContext context) {
+    textScaleFactor = MediaQuery.of(context).textScaler.scale(1) / 1;
+
     return Scaffold(
         appBar: AppBar(
           leading: _buildAppBarLeading(),
@@ -205,6 +202,14 @@ class _NotePageState extends State<NotePage> {
                 onChanged: (value) {
                   setState(() {
                     search = value;
+
+                    if (!noteController.text
+                        .toLowerCase()
+                        .contains(search.toLowerCase())) {
+                      searchNotFound = true;
+                    } else {
+                      searchNotFound = false;
+                    }
                   });
                 },
               ),
@@ -220,6 +225,10 @@ class _NotePageState extends State<NotePage> {
         children: [
           // title text field
           _buildTitleTextFieldWidget(),
+
+          showSearch && searchNotFound && search.isNotEmpty
+              ? const Text('Search not found!', style: TextStyle(fontSize: 10))
+              : const SizedBox(),
 
           // note textfield
           _buildNoteTextFieldWidget(),
@@ -287,6 +296,7 @@ class _NotePageState extends State<NotePage> {
                   alignment: Alignment.topLeft,
                   child: SingleChildScrollView(
                     child: RichText(
+                      textScaler: TextScaler.linear(textScaleFactor),
                       text: _buildHighlightedText(noteController.text),
                     ),
                   ),
@@ -322,7 +332,7 @@ class _NotePageState extends State<NotePage> {
             ? Colors.grey[300]
             : Colors.grey[800]);
     TextStyle textStyle2 = const TextStyle(
-        fontSize: 16, letterSpacing: 0.5, height: 1.5, color: Colors.black);
+        fontSize: 15, letterSpacing: 0.5, height: 1.5, color: Colors.black);
 
     if (search.isEmpty) {
       return TextSpan(text: text, style: textStyle);
